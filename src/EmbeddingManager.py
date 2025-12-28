@@ -100,6 +100,36 @@ class EmbeddingManager:
             logger.error(f"Failed to get processed files: {e}")
             return []
 
+    def get_empty_embedding_files(self) -> Dict[str, List[str]]:
+        """Identify files that have empty vector lists for any section."""
+        results = {}
+        sections = ["abs_vectors", "sum_vectors", "litr_vectors", "ref_vectors", "original_vectors"]
+        try:
+            with sqlite3.connect(self.db_path) as conn:
+                conn.row_factory = sqlite3.Row
+                cursor = conn.execute(f"SELECT filename, {', '.join(sections)} FROM kb_embeddings")
+                for row in cursor:
+                    filename = row["filename"]
+                    empty_sections = []
+                    for section in sections:
+                        v_data = row[section]
+                        if not v_data:
+                            empty_sections.append(section.replace("_vectors", ""))
+                            continue
+                        try:
+                            vs = json.loads(v_data.decode('utf-8'))
+                            if not vs:
+                                empty_sections.append(section.replace("_vectors", ""))
+                        except:
+                            empty_sections.append(section.replace("_vectors", "") + "(parse_error)")
+
+                    if empty_sections:
+                        results[filename] = empty_sections
+            return results
+        except Exception as e:
+            logger.error(f"Failed to check for empty embeddings: {e}")
+            return {}
+
     async def process_file(
         self,
         filename: str,
@@ -192,7 +222,13 @@ class EmbeddingManager:
                     continue
 
                 vs = json.loads(v_data.decode('utf-8'))
+                if not vs:
+                    continue
+
                 matrix = np.array(vs)
+                if matrix.ndim != 2:
+                    continue
+
                 dots = np.dot(matrix, query_v)
                 norms = np.linalg.norm(matrix, axis=1)
                 denom = norms * query_norm
@@ -297,7 +333,13 @@ class EmbeddingManager:
                     continue
 
                 vs = json.loads(v_data.decode('utf-8'))
+                if not vs:
+                    continue
+
                 matrix = np.array(vs)
+                if matrix.ndim != 2:
+                    continue
+
                 dots = np.dot(matrix, query_v)
                 norms = np.linalg.norm(matrix, axis=1)
                 denom = norms * query_norm
@@ -350,7 +392,13 @@ class EmbeddingManager:
                     continue
 
                 vs = json.loads(v_data.decode('utf-8'))
+                if not vs:
+                    continue
+
                 matrix = np.array(vs)
+                if matrix.ndim != 2:
+                    continue
+
                 dots = np.dot(matrix, query_v)
                 norms = np.linalg.norm(matrix, axis=1)
                 denom = norms * query_norm
@@ -403,7 +451,13 @@ class EmbeddingManager:
                     continue
 
                 vs = json.loads(v_data.decode('utf-8'))
+                if not vs:
+                    continue
+
                 matrix = np.array(vs)
+                if matrix.ndim != 2:
+                    continue
+
                 dots = np.dot(matrix, query_v)
                 norms = np.linalg.norm(matrix, axis=1)
                 denom = norms * query_norm
