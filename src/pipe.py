@@ -38,7 +38,19 @@ class Pipe(PanKnode):
     class Valves(BaseModel):
         MODEL_ID: str = Field(
             default="deepseek-chat",
-            description="Model ID for summarizing content",
+            description="Default Model ID (Fallback)",
+        )
+        QUERY_MODEL_ID: str = Field(
+            default="deepseek-chat",
+            description="Model ID for generating search queries (gen_agent_prompt.md)",
+        )
+        KB_MODEL_ID: str = Field(
+            default="deepseek-chat",
+            description="Model ID for knowledge base generation (kb_*.md)",
+        )
+        GEN_MODEL_ID: str = Field(
+            default="deepseek-chat",
+            description="Model ID for final research report (gen_summary_prompt.md)",
         )
         EMBEDDING_BASE_URL: str = Field(
             default="https://openrouter.ai/api",
@@ -206,7 +218,7 @@ class Pipe(PanKnode):
             re_type=re_type,
             output_path=self.OUTPUT_PATH,
             prompt_path=self.PROMPT_PATH,
-            model_id=self.valves.MODEL_ID,
+            model_id=self.valves.KB_MODEL_ID or self.valves.MODEL_ID,
             request=self.__request__,
             user=self.__user__
         )
@@ -282,7 +294,7 @@ class Pipe(PanKnode):
             summary, saved_path = await self.summarize_content(
                 content=processed_content,
                 prompt_path=self.PROMPT_PATH,
-                model_id=self.valves.MODEL_ID,
+                model_id=self.valves.KB_MODEL_ID or self.valves.MODEL_ID,
                 request=self.__request__,
                 user=self.__user__,
                 output_path=self.OUTPUT_PATH,
@@ -354,7 +366,7 @@ class Pipe(PanKnode):
                 summary, _ = await self.summarize_content(
                     content=text_content,
                     prompt_path=self.PROMPT_PATH,
-                    model_id=self.valves.MODEL_ID,
+                    model_id=self.valves.KB_MODEL_ID or self.valves.MODEL_ID,
                     request=self.__request__,
                     user=self.__user__,
                     output_path=self.OUTPUT_PATH,
@@ -520,7 +532,10 @@ class Pipe(PanKnode):
                     clean_title = item["filename"].replace(".md", "").replace("_", " ")
                     report.append(f"### {i+1}. {clean_title}")
                     report.append(f"**Score:** {item['score']:.4f}")
-                    report.append(f"- {item['text']}\n")
+                    # Prepend bullet point to each line of text and remove empty lines
+                    lines = [line.strip() for line in item["text"].split("\n") if line.strip()]
+                    formatted_text = "\n".join([f"- {line}" for line in lines])
+                    report.append(f"{formatted_text}\n")
 
             await self.emit_message("\n".join(report))
             await self.emit_status("success", f"Found {len(results)} {result_desc}", True)
@@ -553,7 +568,8 @@ class Pipe(PanKnode):
                 prompt_dir=self.PROMPT_PATH,
                 __event_emitter__=self.__event_emitter__,
                 search_type=search_type,
-                top_n=top_n
+                top_n=top_n,
+                model_id=self.valves.QUERY_MODEL_ID or self.valves.MODEL_ID
             )
 
             if not context_items:
@@ -570,7 +586,8 @@ class Pipe(PanKnode):
                 valves=self.valves,
                 request=self.__request__,
                 user=self.__user__,
-                prompt_dir=self.PROMPT_PATH
+                prompt_dir=self.PROMPT_PATH,
+                model_id=self.valves.GEN_MODEL_ID or self.valves.MODEL_ID
             )
 
             await self.emit_message(final_report)

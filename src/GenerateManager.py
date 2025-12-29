@@ -22,21 +22,23 @@ class GenerateManager:
         prompt_dir: str,
         __event_emitter__: Any = None,
         search_type: str = "sumr",
-        top_n: int = 30
+        top_n: int = 30,
+        model_id: str = None
     ) -> list[dict]:
         """
         Round 1: Plan queries and execute searches.
         Returns a list of context items.
         """
         # --- Round 1: Query Planning ---
+        actual_model_id = model_id or valves.MODEL_ID
         agent_prompt_path = os.path.join(prompt_dir, "gen_agent_prompt.md")
         agent_instruction = "You are a research agent. Output JSON queries."
         if os.path.exists(agent_prompt_path):
             with open(agent_prompt_path, "r", encoding="utf-8") as f:
-                agent_instruction = f.read().replace("{{user_request}}", user_request)
+                agent_instruction = f.read()
 
         # Call LLM for Round 1
-        round1_response = await self._call_llm(agent_instruction, user_request, valves.MODEL_ID, request, user)
+        round1_response = await self._call_llm(agent_instruction, user_request, actual_model_id, request, user)
 
         # Parse JSON
         queries_data = self._parse_json_safely(round1_response)
@@ -118,7 +120,8 @@ class GenerateManager:
         valves: Any,
         request: Any,
         user: Any,
-        prompt_dir: str
+        prompt_dir: str,
+        model_id: str = None
     ) -> str:
         """
         Round 2: Synthesize academic summary and save report.
@@ -127,6 +130,7 @@ class GenerateManager:
             return "🔍 No relevant information found in the knowledge base."
 
         # Prepare context string
+        actual_model_id = model_id or valves.MODEL_ID
         formatted_context = ""
         for item in context_items:
             formatted_context += f"[{item['id']}] Source: {item['filename']}\nContent: {item['text']}\n\n"
@@ -135,10 +139,10 @@ class GenerateManager:
         summary_instruction = "Write an academic summary based on context."
         if os.path.exists(summary_prompt_path):
             with open(summary_prompt_path, "r", encoding="utf-8") as f:
-                summary_instruction = f.read().replace("{{user_request}}", user_request).replace("{{context}}", formatted_context)
+                summary_instruction = f.read().replace("{{user_request}}", user_request)
 
         # Call LLM for Round 2
-        final_summary = await self._call_llm(summary_instruction, "Please generate the summary now.", valves.MODEL_ID, request, user)
+        final_summary = await self._call_llm(summary_instruction, formatted_context, actual_model_id, request, user)
 
         # Post-processing: Bibliography and Saving
         bibliography = "\n\n### 📚 Sources\n"
@@ -176,19 +180,21 @@ class GenerateManager:
         prompt_dir: str,
         __event_emitter__: Any = None,
         search_type: str = "core",
-        top_n: int = 20
+        top_n: int = 20,
+        query_model_id: str = None,
+        gen_model_id: str = None
     ) -> str:
         """
         Backward compatible wrapper for the two-round flow.
         """
         context_items = await self.generate_research_context(
-            user_request, valves, request, user, prompt_dir, __event_emitter__, search_type, top_n
+            user_request, valves, request, user, prompt_dir, __event_emitter__, search_type, top_n, model_id=query_model_id
         )
         if not context_items:
             return "🔍 No relevant information found."
 
         return await self.synthesize_research_report(
-            user_request, context_items, valves, request, user, prompt_dir
+            user_request, context_items, valves, request, user, prompt_dir, model_id=gen_model_id
         )
 
     async def _call_llm(self, system_prompt: str, user_msg: str, model_id: str, request: Any, user: Any) -> str:

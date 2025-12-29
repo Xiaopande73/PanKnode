@@ -36,6 +36,3 @@ Instead of generating generic queries, break down the user's request into its co
   ]
 }
 ```
-
-## User Request
-{{user_request}}
