@@ -98,9 +98,12 @@ class KBManager:
 
                 if not new_content: return False
 
+                # Clean LLM output: remove leading ## Summary if present
+                new_content = re.sub(r"(?i)^#+\s+Summary\s*$", "", new_content, flags=re.M).strip()
+
                 # Replace Summary section
                 pattern = r"(?m)^#+\s+Summary\s*$(.*?)(?=^#+\s+|\Z)"
-                replacement = f"## Summary\n{new_content.strip()}\n\n"
+                replacement = f"## Summary\n{new_content}\n\n"
 
                 # Check if it exists to replace, or append
                 if re.search(pattern, content, re.DOTALL | re.IGNORECASE):
@@ -123,9 +126,12 @@ class KBManager:
 
                 if not new_content: return False
 
+                # Clean LLM output: remove leading ## Literature Review if present
+                new_content = re.sub(r"(?i)^#+\s+Literature Review\s*$", "", new_content, flags=re.M).strip()
+
                 # Replace Literature Review section
                 pattern = r"(?m)^#+\s+Literature Review\s*$(.*?)(?=^#+\s+|\Z)"
-                replacement = f"## Literature Review\n{new_content.strip()}\n\n"
+                replacement = f"## Literature Review\n{new_content}\n\n"
 
                 if re.search(pattern, content, re.DOTALL | re.IGNORECASE):
                     new_full_content = re.sub(pattern, replacement, content, flags=re.DOTALL | re.IGNORECASE)

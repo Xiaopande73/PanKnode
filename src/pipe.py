@@ -154,16 +154,51 @@ class Pipe(PanKnode):
     async def handle_re(self, content_before: str):
         """Handle the /re command to re-generate specific sections."""
         # Expected format: filename.md type/re
-        # re_type can be absref, sumr, litr
-        match = re.search(r"^(.*?)\s+(absref|sumr|litr)/re$", f"{content_before}/re", re.IGNORECASE)
+        # re_type can be absref, sumr, litr, embedding
+        match = re.search(r"^(.*?)\s+(absref|sumr|litr|embedding)/re$", f"{content_before}/re", re.IGNORECASE)
         if not match:
-            await self.emit_message("⚠️ Invalid format for `/re`. Use `filename.md type/re` where type is `absref`, `sumr`, or `litr`.")
+            await self.emit_message("⚠️ Invalid format for `/re`. Use `filename.md type/re` where type is `absref`, `sumr`, `litr`, or `embedding`.")
             return
 
         filename = match.group(1).strip()
         re_type = match.group(2).lower()
 
-        await self.emit_message(f"🔄 Re-generating {re_type} for `{filename}`. Please wait...")
+        if re_type == "embedding":
+            if not self.valves.EMBEDDING_API_KEY:
+                await self.emit_message("⚠️ `EMBEDDING_API_KEY` is not set in Valves. Please configure it first.")
+                await self.emit_status("error", "API Key missing", True)
+                return
+
+            await self.emit_message(f"🧬 Re-vectorizing `{filename}`. Please wait... \n")
+            await self.emit_status("info", f"Processing embedding for {filename}...", False)
+
+            file_path = os.path.join(self.OUTPUT_PATH, filename)
+            if not os.path.exists(file_path):
+                if not filename.endswith(".md"):
+                    filename += ".md"
+                    file_path = os.path.join(self.OUTPUT_PATH, filename)
+
+                if not os.path.exists(file_path):
+                    await self.emit_message(f"❌ File `{filename}` not found in the knowledge base.")
+                    await self.emit_status("error", "File not found", True)
+                    return
+
+            success = await self.process_file(
+                filename=filename,
+                file_path=file_path,
+                valves=self.valves,
+                api_key=self.valves.EMBEDDING_API_KEY
+            )
+
+            if success:
+                await self.emit_message(f"✅ Successfully re-vectorized `{filename}`.")
+                await self.emit_status("success", "Vectorization complete", True)
+            else:
+                await self.emit_message(f"❌ Failed to vectorize `{filename}`. Check logs for details.")
+                await self.emit_status("error", "Vectorization failed", True)
+            return
+
+        await self.emit_message(f"🔄 Re-generating {re_type} for `{filename}`. Please wait... \n")
         await self.emit_status("info", f"Reprocessing {re_type}...", False)
 
         success = await self.reprocess_section(
@@ -620,7 +655,7 @@ class Pipe(PanKnode):
 
         if last_slash_index == -1:
             # No command found
-            await self.emit_message(f"**PanKnode** is a command-driven tool. Please start your message with a existing `/` command.\n\nType `/help` to see what I can do for you.")
+            await self.emit_message(f"📚 **PanKnode** is a command-driven tool. Please start your message with a existing `/` command.\n\nType `/help` to see what I can do for you.")
             return ""
 
         content_before = raw_message[:last_slash_index].strip()
@@ -647,6 +682,6 @@ class Pipe(PanKnode):
             await self.handle_search(content_before)
         else:
             # Unknown command
-            await self.emit_message(f"**PanKnode** is a command-driven tool. Please start your message with a existing `/` command.\n\nType `/help` to see what I can do for you.")
+            await self.emit_message(f"📚 **PanKnode** is a command-driven tool. Please start your message with a existing `/` command.\n\nType `/help` to see what I can do for you.")
 
         return ""

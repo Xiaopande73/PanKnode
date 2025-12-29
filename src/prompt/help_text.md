@@ -10,5 +10,5 @@ Available commands:
 - `[query] [type]/[count]/query`: Performs a semantic search. `type` can be `file`, `sumr`, `abs`, `litr`, `ref`, or `origin` (default: `file`). `count` is the number of top relevant results to retrieve (default: 20).
 - `[topic] [type]/[count]/generate`: Triggers a two-round research agent. `type` specifies the search source. `count` is the number of context chunks to retrieve for research synthesis (default: 20).
 - `/debug`: Checks the database for files with missing or empty vector sections.
-- `[filename] [type]/re`: Re-generates a specific section of an existing file. `type` can be `absref`, `sumr`, or `litr`.
+- `[filename] [type]/re`: Re-generates a specific section or re-vectorizes an existing file. `type` can be `absref`, `sumr`, `litr`, or `embedding`.
 - `/help`: Shows this help message.
